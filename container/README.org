@@ -1,0 +1,5 @@
+* Simulation of container with a hole
+
+You can place the hole anywhere, just change the elevation.
+
+Change the parameters in the config file to run different simulations. make sure all datatypes are in float. 

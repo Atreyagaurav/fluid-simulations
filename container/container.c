@@ -1,5 +1,3 @@
-#include <SDL2/SDL_rect.h>
-#include <SDL2/SDL_render.h>
 #include <stdio.h>
 #include <math.h>
 #include <SDL2/SDL.h>
@@ -9,9 +7,9 @@
 
 #define CONST_g 9.81
 
-#define SCALEX 20
-#define SCALEY 2
-#define SCALET 100
+#define WIN_WIDTH 150
+#define WIN_HEIGHT 500
+
 
 struct container{
   double height;
@@ -32,6 +30,7 @@ struct sim_state {
   struct pore p1;
   int step;
   double delT;
+  double timestep;
 };
 
 typedef struct {
@@ -39,6 +38,9 @@ typedef struct {
   SDL_Window *window;
   SDL_Rect container;
   SDL_Rect water;
+  double timescale;
+  double xscale;
+  double yscale;
 } App;
 
 void init_everything(config_t *conf, char *confFile, struct sim_state *s, App *a){
@@ -52,6 +54,8 @@ void init_everything(config_t *conf, char *confFile, struct sim_state *s, App *a
   s->c1.area = M_PI_4 * s->c1.diameter * s->c1.diameter;
   config_lookup_float(conf,"pore.diameter",&(s->p1.diameter));
   config_lookup_float(conf,"pore.elevation",&(s->p1.elevation));
+  config_lookup_float(conf,"simulation.timestep",&(s->timestep));
+  config_lookup_float(conf,"simulation.timescale",&(a->timescale));
   s->p1.area = M_PI_4 * s->p1.diameter * s->p1.diameter;
   s->step = 0;
 
@@ -62,14 +66,16 @@ void init_everything(config_t *conf, char *confFile, struct sim_state *s, App *a
   SDL_Init(SDL_INIT_VIDEO);
   a->window = SDL_CreateWindow("SIMULATION", // creates a window
                                      SDL_WINDOWPOS_CENTERED,
-                                     SDL_WINDOWPOS_CENTERED, 1000, 500, windowFlags);
+                                     SDL_WINDOWPOS_CENTERED, WIN_WIDTH, WIN_HEIGHT, windowFlags);
   SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "linear");
   a->renderer = SDL_CreateRenderer(a->window, -1, rendererFlags);
 
-  a->container.x = 100;
-  a->container.y = 100;
-  a->container.w = s->c1.diameter * SCALEX;
-  a->container.h = s->c1.height * SCALEY;
+  a->container.x = 10;
+  a->container.y = 10;
+  a->xscale = (WIN_WIDTH-20) / s->c1.diameter;
+  a->yscale = (WIN_HEIGHT-20) / s->c1.height;
+  a->container.w = s->c1.diameter * a->xscale;
+  a->container.h = s->c1.height * a->yscale;
 }
 
 void destroy_everything(config_t *conf) { config_destroy(conf); }
@@ -103,8 +109,8 @@ int next_step(struct sim_state *s){
 
 void draw(struct sim_state *s, App *a){
   a->water = a->container;
-  a->water.y += (1 - s->c1.fill)*s->c1.height * SCALEY;
-  a->water.h = s->c1.fill * s->c1.height * SCALEY;
+  a->water.y += (1 - s->c1.fill)*s->c1.height * a->yscale;
+  a->water.h = s->c1.fill * s->c1.height * a->yscale;
   
   SDL_SetRenderDrawColor(a->renderer, 0, 0, 0, 255);
   SDL_RenderClear(a->renderer);
@@ -134,7 +140,7 @@ int main(int argc, char *argv[])
   while (next_step(&sims)){
     draw(&sims,&mainapp);
     handle_input();
-    SDL_Delay(sims.delT*1000/SCALET);
+    SDL_Delay(sims.delT*1000/mainapp.timescale);
   }
   destroy_everything(&simconfig);
   return 0;
