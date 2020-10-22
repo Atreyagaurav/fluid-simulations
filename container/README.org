@@ -3,3 +3,47 @@
 You can place the hole anywhere, just change the elevation.
 
 Change the parameters in the config file to run different simulations. make sure all datatypes are in float. 
+
+** How to run
+first compile the program with ~make~ command or ~gcc container.c~, in second case you need to point it to the libraries' header files. The libraries used and their flags are:
+
+| Library | Flag     |
+|---------+----------|
+| Math    | -lm      |
+| Config  | -lconfig |
+| SDL2    | -lSDL2   |
+
+This information can also be understood by reading the ~Makefile~.
+
+Now you can run your compiled program. Running without any argument will give you help menu. you just need to pass the config file as argument. A sample config file ~conf1.conf~ is given. 
+
+Run the program with that config file with the command ~./container conf1.conf~. 
+
+You can see something like this window. 
+
+[[./screenshot.png]]
+
+The size of the screen and offset can be changed by changing the macros on ~container.c~.
+
+** Plotting the output
+Currently I don't have plot inside the program itself but you can extract the output of standard output and then plot it. For example, pipe the output to a file
+#+BEGIN_SRC bash
+./container conf1.conf > data.dat
+#+END_SRC
+
+Then You'll have data.dat with space delimited file with ~time~, ~height~ & ~discharge~. You can now use any plotting program to plot the output. I prefer ~gnuplot~. 
+
+The following code in gnuplot can plot the file. 
+#+BEGIN_SRC gnuplot
+set ytics nomirror
+set y2tics
+plot "data.dat" using 1:2 with lines title "Height",\
+     "" using 1:3 with lines axis x1y2 title "Discharge"
+#+END_SRC
+
+The following plot can be seen. 
+
+[[./sample.png]]
+
+
+
