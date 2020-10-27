@@ -14,6 +14,7 @@
 
 typedef struct sim_state {
   int n;
+  int r;
   double mass;
   double *restrict rho;
   double *restrict x;
@@ -51,6 +52,7 @@ typedef struct {
   double timescale;
   double xscale;
   double yscale;
+  short int pixels[WIN_HEIGHT][WIN_HEIGHT];
 } App;
 
 
@@ -62,7 +64,6 @@ void init_everything(FILE *dataFilep, struct sim_state **s, App *a){
   fread(&n,sizeof(int),1,fp);
   printf("Number of particles: %d\n",n);
   *s = alloc_state(n);
-
   /* init the graphics window */
   int rendererFlags, windowFlags;
   rendererFlags = SDL_RENDERER_ACCELERATED;
@@ -80,6 +81,9 @@ void init_everything(FILE *dataFilep, struct sim_state **s, App *a){
   a->yscale = (WIN_HEIGHT-2*YOFFSET) / 1.0;
   a->container.w = (WIN_WIDTH-2*XOFFSET);
   a->container.h = (WIN_WIDTH-2*YOFFSET);
+  /* need to make program read these from config */
+  (*s)->r = (int) (a->xscale * 2e-2);
+  printf("radius:%d\n",(*s)->r);
 }
 
 void destroy_everything(sim_state_t *s, App *a) {
@@ -120,6 +124,101 @@ int next_step(struct sim_state *s, FILE *fp){
   return 1;
 }
 
+void _put_in_pix(App *a, int x, int y, int flag) {
+  if (x < (WIN_HEIGHT - XOFFSET) && x > (XOFFSET) &&
+      y < (WIN_HEIGHT - YOFFSET) && y > (YOFFSET)) {
+    a->pixels[x][y]+=flag;
+  }
+}
+
+
+void draw_circ(App *a,int x, int y, int r){
+  int r2, xy, p1, p2, rl, rl2;
+  r2 = r * r;
+  rl = (int)(r*1.25);
+  rl2 = rl*rl;
+  _put_in_pix(a,x,y,2);
+  for (p2 = 1; p2 < r; p2++){
+    _put_in_pix(a,x,y+p2,2);
+    _put_in_pix(a,x,y-p2,2);
+  }
+  for (p1 = 1; p1 < r; p1++){
+    _put_in_pix(a,x+p1,y,2);
+    _put_in_pix(a,x-p1,y,2);
+  }
+  for (p1 = 1; p1 < rl; p1++) {
+    for (p2 = 1; p2 < rl; p2++) {
+      xy = (p1 * p1 + p2 * p2);
+      if (xy < r2) {
+        _put_in_pix(a, x + p1, y + p2,2);
+        _put_in_pix(a, x + p1, y - p2,2);
+        _put_in_pix(a, x - p1, y - p2,2);
+        _put_in_pix(a, x - p1, y + p2,2);
+      }else if (xy < rl2) {
+        _put_in_pix(a, x + p1, y + p2,1);
+        _put_in_pix(a, x + p1, y - p2,1);
+        _put_in_pix(a, x - p1, y - p2,1);
+        _put_in_pix(a, x - p1, y + p2,1);
+      }
+    }
+  }
+}
+
+/* int get_pix(App *a, int x, int y){ */
+/*   if (x>=0 && y>=0 && x<=WIN_WIDTH && y<WIN_HEIGHT){ */
+/*     return a->pixels[x][y]; */
+/*   }else{ */
+/*     return 0; */
+/*   } */
+/* } */
+
+/* int _get_count(App *a, int x, int y, int r) { */
+/*   int count = 0; */
+/*   int i, j; */
+/*   int r2, r2l, rl, xy; */
+/*   r2 = r * r; */
+/*   rl = (int)(r * 1.25); */
+/*   r2l = (int)(r2 * 1.5); */
+/*   for (i = 0; i < rl; i++) { */
+/*     for (j = 0; j < rl; j++) { */
+/*       xy = (i * i + j * j); */
+/*       if (xy<r2){ */
+/* 	count += get_pix(a, x+i, y+i)*2; */
+/* 	count += get_pix(a, x+i, y-i)*2; */
+/* 	count += get_pix(a, x-i, y-i)*2; */
+/* 	count += get_pix(a, x-i, y+i)*2; */
+/*       }else if(xy<r2l){ */
+/* 	count += get_pix(a, x+i, y+i); */
+/* 	count += get_pix(a, x+i, y-i); */
+/* 	count += get_pix(a, x-i, y-i); */
+/* 	count += get_pix(a, x-i, y+i); */
+/*       } */
+/*     } */
+/*   } */
+/*   return count; */
+/* } */
+
+void clean_pixels(App *a){
+  int p1, p2;
+  for(p1=XOFFSET;p1<WIN_WIDTH-XOFFSET;p1++){
+    for(p2=YOFFSET;p2<WIN_HEIGHT-YOFFSET;p2++){
+      a->pixels[p1][p2]=0;
+    }
+  }
+}
+
+
+void draw_raster_pix(App *a, int r){
+  int p1, p2;
+  for(p1=XOFFSET;p1<WIN_WIDTH-XOFFSET;p1++){
+    for(p2=YOFFSET;p2<WIN_HEIGHT-YOFFSET;p2++){
+      if (a->pixels[p1][p2]>1){
+	SDL_RenderDrawPoint(a->renderer, p1, p2);
+      }
+    }
+  }
+}
+
 void draw(struct sim_state *s, App *a){
   SDL_SetRenderDrawColor(a->renderer, 0, 0, 0, 255);
   SDL_RenderClear(a->renderer);
@@ -129,13 +228,16 @@ void draw(struct sim_state *s, App *a){
   SDL_SetRenderDrawColor(a->renderer, 96, 96, 255, 255);
 
   int i, n;
-  int x, y;
+  int x, y, r;
   n = s->n;
+  r = s->r;
+  clean_pixels(a);
   for (i = 0; i < n; i++) {
     x = XOFFSET + (int)(s->x[2 * i] * a->xscale);
     y = WIN_HEIGHT - YOFFSET - (int)(s->x[2 * i + 1] * a->yscale);
-    SDL_RenderDrawPoint(a->renderer, x, y);
-  }
+    draw_circ(a, x, y, r);
+    }
+  draw_raster_pix(a,r);
   SDL_RenderPresent(a->renderer);
 }
 
