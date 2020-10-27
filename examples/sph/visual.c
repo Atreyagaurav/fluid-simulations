@@ -14,23 +14,23 @@
 
 typedef struct sim_state {
   int n;
-  float mass;
-  float *restrict rho;
-  float *restrict x;
-  float *restrict vh;
-  float *restrict v;
-  float *restrict a;
+  double mass;
+  double *restrict rho;
+  double *restrict x;
+  double *restrict vh;
+  double *restrict v;
+  double *restrict a;
 } sim_state_t;
 
 sim_state_t *alloc_state(int n){
   sim_state_t *ss;
   ss = malloc(sizeof(sim_state_t));
   ss->n = n;
-  ss->rho = malloc(sizeof(float)*n);
-  ss->x = malloc(sizeof(float)*2*n);
-  ss->v = malloc(sizeof(float)*2*n);
-  ss->vh = malloc(sizeof(float)*2*n);
-  ss->a = malloc(sizeof(float)*2*n);
+  ss->rho = malloc(sizeof(double)*n);
+  ss->x = malloc(sizeof(double)*2*n);
+  ss->v = malloc(sizeof(double)*2*n);
+  ss->vh = malloc(sizeof(double)*2*n);
+  ss->a = malloc(sizeof(double)*2*n);
   return ss;
 };
 
@@ -107,9 +107,9 @@ int next_step(struct sim_state *s, FILE *fp){
     return 0;
   }
   int n = s->n;
-  float *x;
+  double *x;
   x = s->x;
-  float xi,yi,ci;
+  double xi,yi,ci;
   for (int i = 0; i < n; ++i) {
     fread(&xi, sizeof(xi), 1, fp);
     fread(&yi, sizeof(yi), 1, fp);
@@ -141,15 +141,21 @@ void draw(struct sim_state *s, App *a){
 
 int main(int argc, char *argv[])
 {
-  if (argc<2){
-    printf("Usage: %s OUTPUT_FILE\n\n"
-	   "OUTPUT_FILE\tOutput file with details for simulation visualization.\n",argv[0]);
+  int fps;
+  if (argc<2 || argv[1][0]=='-'){
+    printf("Usage: %s OUTPUT_FILE [FPS]\n\n"
+	   "OUTPUT_FILE\tOutput file generated from simulation"
+	   " program to visualize.\n"
+	   "FPS (30) \tframes per second for display\n",argv[0]);
     return EXIT_FAILURE;
+  }else if (argc<3){
+    fps = 30;
+  }else{
+    fps = atoi(argv[2]);
   }
   struct sim_state *sims;
   App mainapp;
   
-  const char *name;
   FILE *fp;
   fp = fopen(argv[1],"r");
   printf("reading %s\n",argv[1]);
@@ -157,7 +163,7 @@ int main(int argc, char *argv[])
   while (next_step(sims,fp)){
     draw(sims,&mainapp);
     handle_input();
-    SDL_Delay(100);
+    SDL_Delay(1000/fps);
   }
   destroy_everything(sims,&mainapp);
   return EXIT_SUCCESS;
